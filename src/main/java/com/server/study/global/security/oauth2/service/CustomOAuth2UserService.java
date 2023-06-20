@@ -17,14 +17,14 @@ import com.server.study.domain.user.User;
 import com.server.study.domain.user.repository.UserRepository;
 import com.server.study.global.security.oauth2.OAuthAttributes;
 import com.server.study.global.security.oauth2.exception.OAuth2AuthenticationProcessingException;
-import com.server.study.global.security.oauth2.userinfo.CustomUserDetails;
+import com.server.study.global.security.oauth2.userinfo.CustomUserPrincipal;
 
 import lombok.RequiredArgsConstructor;
 
 /**
  * description    :
  * packageName    : com.server.study.global.security.oauth2.service
- * fileName       : OAuth2UserService
+ * fileName       : CustomOAuth2UserService
  * author         : tkfdk
  * date           : 2023-06-16
  * ===========================================================
@@ -34,7 +34,7 @@ import lombok.RequiredArgsConstructor;
  */
 @Service
 @RequiredArgsConstructor
-public class OAuth2UserService extends DefaultOAuth2UserService {
+public class CustomOAuth2UserService extends DefaultOAuth2UserService {
 	private final UserRepository userRepository;
 
 	@Override
@@ -79,7 +79,7 @@ public class OAuth2UserService extends DefaultOAuth2UserService {
 			user = registerUser(oAuth2UserRequest, attributes);
 		}
 
-		return CustomUserDetails.create(user, oAuth2User.getAttributes());
+		return CustomUserPrincipal.create(user, oAuth2User.getAttributes());
 	}
 
 	private User registerUser(OAuth2UserRequest oAuth2UserRequest, OAuthAttributes attributes) {

@@ -22,7 +22,8 @@ import com.server.study.CustomCookie;
  * 2023-06-16        tkfdk       최초 생성
  */
 @Repository
-public class CustomAuthorizationRequestRepository implements AuthorizationRequestRepository {
+public class CustomAuthorizationRequestRepository
+	implements AuthorizationRequestRepository<OAuth2AuthorizationRequest> {
 	public static final String OAUTH2_AUTHORIZATION_REQUEST_COOKIE_NAME = "oauth2_auth_request";
 	public static final String REDIRECT_URI_PARAM_COOKIE_NAME = "redirect_uri";
 
@@ -39,8 +40,7 @@ public class CustomAuthorizationRequestRepository implements AuthorizationReques
 	public void saveAuthorizationRequest(OAuth2AuthorizationRequest authorizationRequest, HttpServletRequest request,
 		HttpServletResponse response) {
 		if (authorizationRequest == null) {
-			CustomCookie.deleteCookie(request, response, OAUTH2_AUTHORIZATION_REQUEST_COOKIE_NAME);
-			CustomCookie.deleteCookie(request, response, REDIRECT_URI_PARAM_COOKIE_NAME);
+			removeAuthorizationRequestCookies(request, response);
 			return;
 		}
 

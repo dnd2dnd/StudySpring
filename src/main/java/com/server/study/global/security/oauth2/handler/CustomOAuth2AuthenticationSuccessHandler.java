@@ -4,18 +4,22 @@ import static com.server.study.global.security.oauth2.CustomAuthorizationRequest
 
 import java.io.IOException;
 import java.net.URI;
+import java.util.List;
 import java.util.Optional;
 
 import javax.servlet.http.Cookie;
 import javax.servlet.http.HttpServletRequest;
 import javax.servlet.http.HttpServletResponse;
 
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.web.authentication.SimpleUrlAuthenticationSuccessHandler;
 import org.springframework.stereotype.Component;
 import org.springframework.web.util.UriComponentsBuilder;
 
 import com.server.study.CustomCookie;
+import com.server.study.global.security.dto.AuthDto;
+import com.server.study.global.security.jwt.TokenProvider;
 import com.server.study.global.security.oauth2.CustomAuthorizationRequestRepository;
 import com.server.study.global.security.oauth2.exception.BadRequestException;
 
@@ -34,7 +38,9 @@ import lombok.RequiredArgsConstructor;
  */
 @Component
 @RequiredArgsConstructor
-public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationSuccessHandler {
+public class CustomOAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationSuccessHandler {
+	@Value("#{'${app.oauth2.authorizedRedirectUris}'.split(',')}")
+	private List<String> authorizedRedirectUris;
 	private final TokenProvider tokenProvider;
 	private final CustomAuthorizationRequestRepository httpCookieOAuth2AuthorizationRequestRepository;
 
@@ -59,10 +65,9 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
 			throw new BadRequestException("unauthorized Redirect URI");
 
 		String targetUri = redirectUri.orElse(getDefaultTargetUrl());
-		String token = tokenProvider.creatToken(authentication);
+		AuthDto.TokenDto tokenDto = tokenProvider.createTokenOAuth2(authentication);
 		return UriComponentsBuilder.fromUriString(targetUri)
-			.queryParam("error", "")
-			.queryParam("token", token)
+			.queryParam("token", tokenDto.getAccessToken())
 			.build().toUriString();
 	}
 
@@ -73,7 +78,7 @@ public class OAuth2AuthenticationSuccessHandler extends SimpleUrlAuthenticationS
 
 	private boolean isAuthorizedRedirectUri(String uri) {
 		URI clientRedirectUri = URI.create(uri);
-		return appProperties.getOauth2().getAuthorizedRedirectUris()
+		return authorizedRedirectUris
 			.stream()
 			.anyMatch(authorizedRedirectUri -> {
 				URI authorizedURI = URI.create(authorizedRedirectUri);

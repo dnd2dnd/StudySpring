@@ -1,11 +1,12 @@
 package com.server.study.domain.user;
 
+import java.util.UUID;
+
 import javax.persistence.Column;
 import javax.persistence.Entity;
 import javax.persistence.EnumType;
 import javax.persistence.Enumerated;
 import javax.persistence.GeneratedValue;
-import javax.persistence.GenerationType;
 import javax.persistence.Id;
 import javax.persistence.Table;
 
@@ -38,9 +39,9 @@ import lombok.Setter;
 @NoArgsConstructor(access = AccessLevel.PROTECTED)
 public class User extends BaseTime {
 	@Id
-	@GeneratedValue(strategy = GenerationType.IDENTITY)
-	@Column(name = "user_id", nullable = false)
-	private Long id;
+	@GeneratedValue
+	@Column(name = "user_id", columnDefinition = "BINARY(16)")
+	private UUID id;
 
 	@Column(nullable = false)
 	private String email;

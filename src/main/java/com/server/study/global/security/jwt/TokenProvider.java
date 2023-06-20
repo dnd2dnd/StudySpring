@@ -1,9 +1,29 @@
 package com.server.study.global.security.jwt;
 
-import java.util.List;
+import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Service;
+
+import com.server.study.global.security.RedisService;
+import com.server.study.global.security.dto.AuthDto;
+import com.server.study.global.security.oauth2.exception.OAuth2AuthenticationProcessingException;
+import com.server.study.global.security.oauth2.service.CustomUserDetailsService;
+import com.server.study.global.security.oauth2.userinfo.CustomUserPrincipal;
+
+import io.jsonwebtoken.Claims;
+import io.jsonwebtoken.Jwts;
+import io.jsonwebtoken.MalformedJwtException;
+import io.jsonwebtoken.SignatureAlgorithm;
+import io.jsonwebtoken.SignatureException;
+import lombok.RequiredArgsConstructor;
 
 /**
  * description    :
@@ -17,39 +37,60 @@ import org.springframework.stereotype.Service;
  * 2023-06-16        tkfdk       최초 생성
  */
 @Service
+@RequiredArgsConstructor
 public class TokenProvider {
 	@Value("${app.auth.tokenSecret}")
 	private String tokenSecret;
 	@Value("${app.auth.tokenExpirationMsec}")
 	private long tokenExpirationMsec;
-	@Value("#{'${app.oauth2.authorizedRedirectUris}'.split(',')}")
-	private List<String> authorizedRedirectUris;
 
-	public String creatToken(Authentication authentication) {
-		UserPrincipal userPrincipal = (UserPrincipal)authentication.getPrincipal();
+	private final RedisService redisService;
+	private final CustomUserDetailsService customUserDetailsService;
 
-		Date now = new Date();
-		Date expiryDate = new Date(now.getTime() + appProperties.getAuth().getTokenExpirationTime());
-
-		return Jwts.builder()
-			.setSubject(Long.toString(userPrincipal.getId()))
-			.setIssuedAt(new Date())
-			.setExpiration(expiryDate)
-			.signWith(SignatureAlgorithm.HS512, appProperties.getAuth().getTokenSecret())
-			.compact();
+	public AuthDto.TokenDto createTokenOAuth2(Authentication authentication) {
+		CustomUserPrincipal userPrincipal = (CustomUserPrincipal)authentication.getPrincipal();
+		return createToken(userPrincipal.getId(), userPrincipal.getEmail(), getAuthorities(authentication));
 	}
 
-	public Long getUserIdFromToken(String token) {
-		Claims claims = Jwts.parser()
-			.setSigningKey(appProperties.getAuth().getTokenSecret())
+	public AuthDto.TokenDto createToken(UUID userId, String email, String authorities) {
+		String accessToken = Jwts.builder()
+			.setHeader(createHeader())
+			.claim("email", email)
+			.claim("authorities", authorities)
+			.setSubject("accessToken")
+			.setExpiration(createExpiredDate(1))
+			.signWith(SignatureAlgorithm.HS512, tokenSecret)
+			.compact();
+
+		String refreshToken = Jwts.builder()
+			.setHeader(createHeader())
+			.setSubject("refreshToken")
+			.setExpiration(createExpiredDate(2 * 7 * 24))
+			.signWith(SignatureAlgorithm.HS512, tokenSecret)
+			.compact();
+
+		redisService.setValuesWithTimeout(userId.toString(), refreshToken,
+			getClaims(refreshToken).getExpiration().getTime());
+
+		return new AuthDto.TokenDto(accessToken, refreshToken);
+	}
+
+	public Claims getClaims(String token) {
+		return Jwts.parser()
+			.setSigningKey(tokenSecret)
 			.parseClaimsJws(token)
 			.getBody();
-		return Long.parseLong(claims.getSubject());
+	}
+
+	public String getAuthorities(Authentication authentication) {
+		return authentication.getAuthorities().stream()
+			.map(GrantedAuthority::getAuthority)
+			.collect(Collectors.joining(","));
 	}
 
 	public boolean validateToken(String token) {
 		try {
-			Jwts.parser().setSigningKey(appProperties.getAuth().getTokenSecret()).parseClaimsJws(token);
+			Jwts.parser().setSigningKey(tokenSecret).parseClaimsJws(token);
 			return true;
 		} catch (SignatureException e) { // 유효하지 않은 JWT 서명
 			throw new OAuth2AuthenticationProcessingException("not valid jwt signature");
@@ -62,5 +103,24 @@ public class TokenProvider {
 		} catch (IllegalArgumentException e) { // 빈값
 			throw new OAuth2AuthenticationProcessingException("empty jwt");
 		}
+	}
+
+	private Map<String, Object> createHeader() {
+		Map<String, Object> header = new HashMap<>();
+		header.put("typ", "JWT");
+		header.put("alg", "HS256");
+		header.put("regDate", System.currentTimeMillis());
+		return header;
+	}
+
+	private Date createExpiredDate(int time) {
+		Date now = new Date();
+		return new Date(now.getTime() + tokenExpirationMsec * time);
+	}
+
+	public Authentication getAuthentication(String token) {
+		String email = getClaims(token).get("email").toString();
+		CustomUserPrincipal userDetails = customUserDetailsService.loadUserByUsername(email);
+		return new UsernamePasswordAuthenticationToken(userDetails, null, userDetails.getAuthorities());
 	}
 }

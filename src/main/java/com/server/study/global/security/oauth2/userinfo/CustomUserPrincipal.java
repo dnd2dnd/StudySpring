@@ -4,6 +4,7 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
@@ -29,34 +30,34 @@ import lombok.Setter;
  */
 @Getter
 @AllArgsConstructor
-public class CustomUserDetails implements OAuth2User, UserDetails {
-	private long id;
+public class CustomUserPrincipal implements OAuth2User, UserDetails {
+	private UUID id;
 	private String email;
-	private String getPassword;
+	private String password;
 	private Collection<? extends GrantedAuthority> authorities;
 	@Setter
 	private Map<String, Object> attributes;
 
-	public static CustomUserDetails create(User user) {
+	public static CustomUserPrincipal create(User user) {
 		List<GrantedAuthority> authorities = Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER"));
 
-		return new CustomUserDetails(user.getId(), user.getEmail(), user.getPassword(), authorities, null);
+		return new CustomUserPrincipal(user.getId(), user.getEmail(), user.getPassword(), authorities, null);
 	}
 
-	public static CustomUserDetails create(User user, Map<String, Object> attributes) {
-		CustomUserDetails customUserDetails = CustomUserDetails.create(user);
-		customUserDetails.setAttributes(attributes);
-		return customUserDetails;
+	public static CustomUserPrincipal create(User user, Map<String, Object> attributes) {
+		CustomUserPrincipal customUserPrincipal = CustomUserPrincipal.create(user);
+		customUserPrincipal.setAttributes(attributes);
+		return customUserPrincipal;
 	}
 
 	@Override
 	public String getPassword() {
-		return getPassword;
+		return password;
 	}
 
 	@Override
 	public String getUsername() {
-		return getEmail();
+		return email;
 	}
 
 	@Override
@@ -91,6 +92,6 @@ public class CustomUserDetails implements OAuth2User, UserDetails {
 
 	@Override
 	public String getName() {
-		return String.valueOf(id);
+		return id.toString();
 	}
 }
